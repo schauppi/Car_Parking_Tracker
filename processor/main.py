@@ -3,12 +3,17 @@ import pickle
 import numpy as np
 import math
 import time
+import sys
+import getopt
+
+RAW_IMAGE_DIRECTORY = '../data/raw/'
 
 width, height = 25, 80
 angle = 62
 
 with open('CarParkPos', 'rb') as f:
     posList = pickle.load(f)
+
 
 def rotate_rect(origin, point, angle):
     angle = math.radians(angle)
@@ -18,6 +23,7 @@ def rotate_rect(origin, point, angle):
     qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
     qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
     return int(qx), int(qy)
+
 
 def checkParkingSpace(imgPro, img):
     spaceCounter = 0
@@ -30,9 +36,9 @@ def checkParkingSpace(imgPro, img):
         cx = int(pos1[0] + ((pos3[0] - pos1[0]) / 2))
         cy = int(pos1[1] + ((pos3[1] - pos1[1]) / 2))
 
-        #center point
-        p_m = pos1[0] + 25, pos1[1] +25
-        #transform points
+        # center point
+        p_m = pos1[0] + 25, pos1[1] + 25
+        # transform points
         p1_rot = rotate_rect(p_m, pos1, angle)
         p2_rot = rotate_rect(p_m, pos2, angle)
         p3_rot = rotate_rect(p_m, pos3, angle)
@@ -47,10 +53,9 @@ def checkParkingSpace(imgPro, img):
         out = np.zeros_like(imgPro)
         out[mask == 255] = imgPro[mask == 255]
 
-
         count = cv2.countNonZero(out)
-        cv2.putText(img,str(count), (p_m[0]-20,p_m[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255))
-        #cv2.imwrite(f"test{count}.png", out)
+        cv2.putText(img, str(count), (p_m[0] - 20, p_m[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255))
+        # cv2.imwrite(f"test{count}.png", out)
 
         if count < 150:
             color = (0, 255, 0)
@@ -61,21 +66,62 @@ def checkParkingSpace(imgPro, img):
             thickness = 2
 
         cv2.drawContours(img, [trans_array], 0, color, thickness, cv2.LINE_AA)
-    cv2.putText(img, f"Free: {spaceCounter}/{len(posList)}", (int(img.shape[0]/2), int(img.shape[1]/2)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 200, 0))
+    cv2.putText(img, f"Free: {spaceCounter}/{len(posList)}", (int(img.shape[0] / 2), int(img.shape[1] / 2)),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 200, 0))
 
 
-while True:
-    img = cv2.imread("parking_lot.jpeg")
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+def extractCmdArguments():
+    leftInputFileName = ''
+    rightInputFileName = ''
+    stitchedOutputFileName = ''
+    processedOutputFileName = ''
+
+    try:
+        opts = getopt.getopt(sys.argv[1:], 'l:r:s:o:')[0]
+    except Exception as err:
+        print(err, file=sys.stderr)
+        sys.exit(2)
+    for opt, arg in opts:
+        if (opt == '-l'):
+            leftInputFileName = arg
+        elif (opt == '-r'):
+            rightInputFileName = arg
+        elif (opt == '-s'):
+            stitchedOutputFileName = arg
+        elif (opt == '-o'):
+            processedOutputFileName = arg
+    if ((not leftInputFileName) or (not rightInputFileName) or (not stitchedOutputFileName) or (
+    not processedOutputFileName)):
+        print('Not all required options were provided', file=sys.stderr)
+        sys.exit(2)
+    return leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName
+
+
+def stitchImages(leftImageName, rightImageName, stichedImageName):
+    leftImage = cv2.imread(RAW_IMAGE_DIRECTORY + leftImageName)
+    rightImage = cv2.imread(RAW_IMAGE_DIRECTORY + rightImageName)
+
+    stitcher = cv2.Stitcher.create(cv2.STITCHER_PANORAMA)
+    stitchedImage = stitcher.stitch([leftImage, rightImage])[1]
+
+    cv2.imwrite('../data/raw/' + stichedImageName, stitchedImage)
+
+    return stitchedImage
+
+
+def processImage(image):
+    imgGray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     imgBlur = cv2.GaussianBlur(imgGray, (3, 3), 1)
-    imgThreshold = cv2.adaptiveThreshold(imgBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                         cv2.THRESH_BINARY_INV, 25, 16)
+    imgThreshold = cv2.adaptiveThreshold(imgBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 16)
     imgMedian = cv2.medianBlur(imgThreshold, 5)
     kernel = np.ones((3, 3), np.uint8)
     imgDilate = cv2.dilate(imgMedian, kernel, iterations=1)
-    checkParkingSpace(imgDilate, img)
+    checkParkingSpace(imgDilate, image)
+    # cv2.imshow("Image", imgMedian)
+    # cv2.waitKey(1)
+    # time.sleep(10)
 
-    cv2.imshow("Image", img)
-    cv2.waitKey(1)
-    time.sleep(5)
 
+leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName = extractCmdArguments()
+stitchedImage = stitchImages(leftInputFileName, rightInputFileName, stitchedOutputFileName)
+processImage(stitchedImage)
