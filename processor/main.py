@@ -11,7 +11,6 @@ with open('CarParkPos', 'rb') as f:
     posList = pickle.load(f)
 
 def rotate_rect(origin, point, angle):
-
     angle = math.radians(angle)
     ox, oy = origin
     px, py = point
