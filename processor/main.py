@@ -7,6 +7,7 @@ import sys
 import getopt
 
 RAW_IMAGE_DIRECTORY = '../data/raw/'
+PROCESSED_IMAGE_DIRECTORY = '../data/processed/'
 
 width, height = 25, 80
 angle = 62
@@ -15,47 +16,49 @@ with open('CarParkPos', 'rb') as f:
     posList = pickle.load(f)
 
 
-def rotate_rect(origin, point, angle):
-    angle = math.radians(angle)
-    ox, oy = origin
-    px, py = point
+def transformParkingSpace(position, positionCenter):
+    positionTopLeft = position
+    positionBottomLeft = position[0], positionTopLeft[1] + height
+    positionBottomRight = position[0] + width, position[1] + height
+    positionTopRight = position[0] + width, position[1]
 
-    qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
-    qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
+    rotatedPositionTopLeft = rotateRect(positionCenter, positionTopLeft, angle)
+    rotatedPositionBottomLeft = rotateRect(positionCenter, positionBottomLeft, angle)
+    rotatedPositionBottomRight = rotateRect(positionCenter, positionBottomRight, angle)
+    rotatedPositionTopRight = rotateRect(positionCenter, positionTopRight, angle)
+
+    transformedArray = np.array(
+        [rotatedPositionTopLeft, rotatedPositionBottomLeft, rotatedPositionBottomRight, rotatedPositionTopRight])
+
+    return transformedArray
+
+
+def rotateRect(origin, point, angle):
+    angle = math.radians(angle)
+    originX, originY = origin
+    pointX, pointY = point
+
+    qx = originX + math.cos(angle) * (pointX - originX) - math.sin(angle) * (pointY - originY)
+    qy = originY + math.sin(angle) * (pointX - originX) + math.cos(angle) * (pointY - originY)
+
     return int(qx), int(qy)
 
 
-def checkParkingSpace(imgPro, img):
+def checkParkingSpace(preparedImage, image, outputFilename):
     spaceCounter = 0
+
     for i, pos in enumerate(posList):
-        x, y = pos
-        pos1 = pos
-        pos2 = pos[0] + 0, pos[1] + height
-        pos3 = pos[0] + width, pos[1] + height
-        pos4 = pos[0] + width, pos[1] + 0
-        cx = int(pos1[0] + ((pos3[0] - pos1[0]) / 2))
-        cy = int(pos1[1] + ((pos3[1] - pos1[1]) / 2))
+        positionCenter = pos[0] + 25, pos[1] + 25
+        transformedArray = transformParkingSpace(pos, positionCenter)
 
-        # center point
-        p_m = pos1[0] + 25, pos1[1] + 25
-        # transform points
-        p1_rot = rotate_rect(p_m, pos1, angle)
-        p2_rot = rotate_rect(p_m, pos2, angle)
-        p3_rot = rotate_rect(p_m, pos3, angle)
-        p4_rot = rotate_rect(p_m, pos4, angle)
-
-        trans_array = np.array([p1_rot, p2_rot, p3_rot, p4_rot])
-
-        cv2.drawContours(img, [trans_array], 0, (155, 155, 155), 2, cv2.LINE_AA)
-
-        mask = np.zeros_like(imgPro)
-        cv2.drawContours(mask, [trans_array], 0, (255, 255, 255), -1)
-        out = np.zeros_like(imgPro)
-        out[mask == 255] = imgPro[mask == 255]
-
+        cv2.drawContours(image, [transformedArray], 0, (155, 155, 155), 2, cv2.LINE_AA)
+        mask = np.zeros_like(preparedImage)
+        cv2.drawContours(mask, [transformedArray], 0, (255, 255, 255), -1)
+        out = np.zeros_like(preparedImage)
+        out[mask == 255] = preparedImage[mask == 255]
         count = cv2.countNonZero(out)
-        cv2.putText(img, str(count), (p_m[0] - 20, p_m[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255))
-        # cv2.imwrite(f"test{count}.png", out)
+        cv2.putText(image, str(count), (positionCenter[0] - 20, positionCenter[1]), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (0, 0, 255))
 
         if count < 150:
             color = (0, 255, 0)
@@ -65,9 +68,27 @@ def checkParkingSpace(imgPro, img):
             color = (0, 0, 255)
             thickness = 2
 
-        cv2.drawContours(img, [trans_array], 0, color, thickness, cv2.LINE_AA)
-    cv2.putText(img, f"Free: {spaceCounter}/{len(posList)}", (int(img.shape[0] / 2), int(img.shape[1] / 2)),
+        cv2.drawContours(image, [transformedArray], 0, color, thickness, cv2.LINE_AA)
+    cv2.putText(image, f"Free: {spaceCounter}/{len(posList)}", (int(image.shape[0] / 2), int(image.shape[1] / 2)),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 200, 0))
+    print(PROCESSED_IMAGE_DIRECTORY)
+    print(outputFilename)
+    cv2.imwrite(PROCESSED_IMAGE_DIRECTORY + outputFilename, image)
+    # cv2.imshow("Image", image)
+    # cv2.waitKey(1)
+    # time.sleep(10)
+
+
+def prepareImage(image):
+    grayscaledImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blurredImage = cv2.GaussianBlur(grayscaledImage, (3, 3), 1)
+    shapedImage = cv2.adaptiveThreshold(blurredImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25,
+                                        16)
+    medianImage = cv2.medianBlur(shapedImage, 5)
+    kernel = np.ones((3, 3), np.uint8)
+    dilatedImage = cv2.dilate(medianImage, kernel, iterations=1)
+
+    return dilatedImage
 
 
 def extractCmdArguments():
@@ -91,7 +112,7 @@ def extractCmdArguments():
         elif (opt == '-o'):
             processedOutputFileName = arg
     if ((not leftInputFileName) or (not rightInputFileName) or (not stitchedOutputFileName) or (
-    not processedOutputFileName)):
+            not processedOutputFileName)):
         print('Not all required options were provided', file=sys.stderr)
         sys.exit(2)
     return leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName
@@ -109,19 +130,11 @@ def stitchImages(leftImageName, rightImageName, stichedImageName):
     return stitchedImage
 
 
-def processImage(image):
-    imgGray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    imgBlur = cv2.GaussianBlur(imgGray, (3, 3), 1)
-    imgThreshold = cv2.adaptiveThreshold(imgBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 16)
-    imgMedian = cv2.medianBlur(imgThreshold, 5)
-    kernel = np.ones((3, 3), np.uint8)
-    imgDilate = cv2.dilate(imgMedian, kernel, iterations=1)
-    checkParkingSpace(imgDilate, image)
-    # cv2.imshow("Image", imgMedian)
-    # cv2.waitKey(1)
-    # time.sleep(10)
+def processImage(image, outputFilename):
+    preparedImage = prepareImage(image)
+    checkParkingSpace(preparedImage, image, outputFilename)
 
 
 leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName = extractCmdArguments()
 stitchedImage = stitchImages(leftInputFileName, rightInputFileName, stitchedOutputFileName)
-processImage(stitchedImage)
+processImage(stitchedImage, processedOutputFileName)

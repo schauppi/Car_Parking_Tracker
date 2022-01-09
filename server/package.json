@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node --loader ts-node/ems ./index.ts"
+    "start": "node --loader ts-node/esm ./index.ts"
   },
   "author": "David Schwarz <david@ists-wurscht.at>, David Schaupp <schaupp@iwas.com>",
   "license": "ISC",
