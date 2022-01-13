@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/processor/main.py" />
-    <option name="PARAMETERS" value="-i FhParkPositions -l fh_left.jpg -r fh_right.jpg -s fh_stitched.jpg -o fh.jpg" />
+    <option name="PARAMETERS" value="-i FhParkPositions -l fh_left.jpg -r fh_right.jpg -s fh_stitched.jpg -o fh.jpg -c" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

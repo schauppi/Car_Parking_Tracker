@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Parking Lot" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="Parking Main" type="PythonConfigurationType" factoryName="Python">
     <module name="car-parkin-tracker" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
