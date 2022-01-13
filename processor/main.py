@@ -2,36 +2,16 @@ import getopt
 import math
 import pickle
 import sys
-import time
 import operator
 import cv2
 import numpy as np
 
 RAW_IMAGE_DIRECTORY = '../data/raw/'
 PROCESSED_IMAGE_DIRECTORY = '../data/processed/'
+EXAMPLE_IMAGE_DIRECTORY = '../data/examples/'
 
 positionList = None
 imgOffsetX = 0
-
-width, height = 25, 80
-angle = 62
-
-
-def transformParkingSpace(position, positionCenter):
-    positionTopLeft = position
-    positionBottomLeft = position[0], positionTopLeft[1] + height
-    positionBottomRight = position[0] + width, position[1] + height
-    positionTopRight = position[0] + width, position[1]
-
-    rotatedPositionTopLeft = rotateRect(positionCenter, positionTopLeft, angle)
-    rotatedPositionBottomLeft = rotateRect(positionCenter, positionBottomLeft, angle)
-    rotatedPositionBottomRight = rotateRect(positionCenter, positionBottomRight, angle)
-    rotatedPositionTopRight = rotateRect(positionCenter, positionTopRight, angle)
-
-    transformedArray = np.array(
-        [rotatedPositionTopLeft, rotatedPositionBottomLeft, rotatedPositionBottomRight, rotatedPositionTopRight])
-
-    return transformedArray
 
 
 def rotateRect(origin, point, angle):
@@ -76,11 +56,18 @@ def checkParkingSpace(preparedImage, image, outputFilename):
         positionBounds = getPolygonBounds(position)
         positionArray = np.array(position)
 
-        # cv2.polylines(image, [positionArray], True, (155, 155, 155), 2, cv2.LINE_AA)
         mask = np.zeros_like(preparedImage)
         cv2.fillPoly(mask, [positionArray], (255, 255, 255))
+        cv2.imwrite(EXAMPLE_IMAGE_DIRECTORY + 'mask_' + str(i) + '_' + outputFilename, mask)
+
         out = cv2.bitwise_and(preparedImage, preparedImage, mask=mask)
+        cv2.imwrite(EXAMPLE_IMAGE_DIRECTORY + 'out_' + str(i) + '_' + outputFilename, out)
+        testOut = cv2.bitwise_and(image, image, mask=mask)
+        cv2.imwrite(EXAMPLE_IMAGE_DIRECTORY + 'testOut_' + str(i) + '_' + outputFilename, testOut)
         croppedOut = out[positionBounds[1]:positionBounds[3], positionBounds[0]:positionBounds[2]]
+        cv2.imwrite(EXAMPLE_IMAGE_DIRECTORY + 'croppedOut_' + str(i) + '_' + outputFilename, croppedOut)
+        testCroppedOut = testOut[positionBounds[1]:positionBounds[3], positionBounds[0]:positionBounds[2]]
+        cv2.imwrite(EXAMPLE_IMAGE_DIRECTORY + 'testCropptedOut_' + str(i) + '_' + outputFilename, testCroppedOut)
 
         whitePixelCount = cv2.countNonZero(croppedOut)
         totalPixelCount = croppedOut.shape[0] * croppedOut.shape[1]
