@@ -19,10 +19,15 @@ function processSnapshot (leftFilename: string, rightFilename: string, stitchedF
       if (err) {
         reject(err)
       } else {
-        console.log(stdout)
+        resolve(stdout)
       }
     })
   })
+}
+
+function parseProcessOutput(output: string): {free: number, total: number} {
+  const [free, total] = output.split('/').map(part => part.trim()).map(part => parseInt(part))
+  return {free, total}
 }
 
 async function createAndProcessSnapshot (): Promise<void> {
@@ -30,8 +35,10 @@ async function createAndProcessSnapshot (): Promise<void> {
   // const [leftFilename, rightFilename] = await camera.snapshot(timestamp)
   // const stitchedFilename = timestamp + '__stitched.jpg'
   // const processedFilename = timestamp + '.jpg'
-  await processSnapshot('parking_lot_left.jpg', 'parking_lot_right.jpg', 'parking_lot_stitched.jpg', 'parking_lot.jpg')
-  // await processSnapshot(leftFilename, rightFilename, stitchedFilename, processedFilename)
+  const output = await processSnapshot('parking_lot_left.jpg', 'parking_lot_right.jpg', 'parking_lot_stitched.jpg', 'parking_lot.jpg')
+  // const output = await processSnapshot(leftFilename, rightFilename, stitchedFilename, processedFilename)
+  const parsedResult = parseProcessOutput(output)
+  console.log(parsedResult)
 }
 
 export async function initLoop () {

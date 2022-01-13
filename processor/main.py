@@ -2,18 +2,15 @@ import cv2
 import pickle
 import numpy as np
 import math
-import time
 import sys
 import getopt
 
 RAW_IMAGE_DIRECTORY = '../data/raw/'
 PROCESSED_IMAGE_DIRECTORY = '../data/processed/'
 
+posList = None
 width, height = 25, 80
 angle = 62
-
-with open('CarParkPos', 'rb') as f:
-    posList = pickle.load(f)
 
 
 def transformParkingSpace(position, positionCenter):
@@ -45,6 +42,7 @@ def rotateRect(origin, point, angle):
 
 
 def checkParkingSpace(preparedImage, image, outputFilename):
+    global posList
     spaceCounter = 0
 
     for i, pos in enumerate(posList):
@@ -71,8 +69,9 @@ def checkParkingSpace(preparedImage, image, outputFilename):
         cv2.drawContours(image, [transformedArray], 0, color, thickness, cv2.LINE_AA)
     cv2.putText(image, f"Free: {spaceCounter}/{len(posList)}", (int(image.shape[0] / 2), int(image.shape[1] / 2)),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 200, 0))
-    print(PROCESSED_IMAGE_DIRECTORY)
-    print(outputFilename)
+    # print(PROCESSED_IMAGE_DIRECTORY)
+    # print(outputFilename)
+    print(f'{spaceCounter}/{len(posList)}')
     cv2.imwrite(PROCESSED_IMAGE_DIRECTORY + outputFilename, image)
     # cv2.imshow("Image", image)
     # cv2.waitKey(1)
@@ -92,30 +91,33 @@ def prepareImage(image):
 
 
 def extractCmdArguments():
+    positionListFileName = ''
     leftInputFileName = ''
     rightInputFileName = ''
     stitchedOutputFileName = ''
     processedOutputFileName = ''
 
     try:
-        opts = getopt.getopt(sys.argv[1:], 'l:r:s:o:')[0]
+        opts = getopt.getopt(sys.argv[1:], 'l:r:s:o:i:')[0]
     except Exception as err:
         print(err, file=sys.stderr)
         sys.exit(2)
     for opt, arg in opts:
-        if (opt == '-l'):
+        if opt == '-l':
             leftInputFileName = arg
-        elif (opt == '-r'):
+        elif opt == '-r':
             rightInputFileName = arg
-        elif (opt == '-s'):
+        elif opt == '-s':
             stitchedOutputFileName = arg
-        elif (opt == '-o'):
+        elif opt == '-o':
             processedOutputFileName = arg
+        elif opt == '-i':
+            positionListFileName = arg
     if ((not leftInputFileName) or (not rightInputFileName) or (not stitchedOutputFileName) or (
-            not processedOutputFileName)):
+            not processedOutputFileName) or (not positionListFileName)):
         print('Not all required options were provided', file=sys.stderr)
         sys.exit(2)
-    return leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName
+    return leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName, positionListFileName
 
 
 def stitchImages(leftImageName, rightImageName, stichedImageName):
@@ -135,6 +137,13 @@ def processImage(image, outputFilename):
     checkParkingSpace(preparedImage, image, outputFilename)
 
 
-leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName = extractCmdArguments()
+leftInputFileName, rightInputFileName, stitchedOutputFileName, processedOutputFileName, positionListFileName = extractCmdArguments()
+
+try:
+    with open(positionListFileName, 'rb') as f:
+        posList = pickle.load(f)
+except:
+    posList = []
+
 stitchedImage = stitchImages(leftInputFileName, rightInputFileName, stitchedOutputFileName)
 processImage(stitchedImage, processedOutputFileName)
